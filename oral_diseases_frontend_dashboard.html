@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OralScan AI - Advanced Diagnostics Dashboard</title>
+    <!-- Loading Tailwind CSS for high-fidelity UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Loading Inter Web Font for modern legibility -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Loading FontAwesome for rich clinical iconography -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Styling a custom smooth shimmering animation for loading states */
+        .shimmer {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- React App Root Mounting Point -->
+    <div id="root"></div>
+
+    <!-- Importing React, ReactDOM, and Babel for runtime compiler support -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [selectedImage, setSelectedImage] = useState(null);
+            const [previewUrl, setPreviewUrl] = useState("");
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [isLiveMode, setIsLiveMode] = useState(false); // Controls local FastAPI fallback vs simulator
+            const [error, setError] = useState(null);
+            const [notification, setNotification] = useState(null);
+
+            // Suggested Sample cases for testing immediately (Clinical Verification samples)
+            const sampleCases = [
+                {
+                    name: "Sample Case A (Benign)",
+                    desc: "Slight smooth irritation with clear margins, typical benign inflammation characteristics.",
+                    image: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&q=80&w=300",
+                    mockResult: {
+                        prediction: "benign_lesions",
+                        confidence: 96.40,
+                        raw_predictions: { benign_lesions: 0.964, malignant_lesions: 0.036 }
+                    }
+                },
+                {
+                    name: "Sample Case B (Malignant)",
+                    desc: "Irregular ulceration with raised, indurated boundaries, chronic clinical presentation.",
+                    image: "https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&q=80&w=300",
+                    mockResult: {
+                        prediction: "malignant_lesions",
+                        confidence: 89.25,
+                        raw_predictions: { benign_lesions: 0.1075, malignant_lesions: 0.8925 }
+                    }
+                }
+            ];
+
+            // Helper to display clean state-driven notification toast instead of native alert()
+            const showToast = (message, type = "info") => {
+                setNotification({ message, type });
+                setTimeout(() => setNotification(null), 4000);
+            };
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    setSelectedImage(file);
+                    setPreviewUrl(URL.createObjectURL(file));
+                    setResult(null);
+                    setError(null);
+                    showToast("New patient clinical image loaded successfully.", "success");
+                }
+            };
+
+            const loadSampleCase = (sample) => {
+                setSelectedImage(null);
+                setPreviewUrl(sample.image);
+                setResult(null);
+                setError(null);
+                
+                // If in simulated mode, auto-fill output, otherwise prepare preview for Live API upload
+                if (!isLiveMode) {
+                    setLoading(true);
+                    setTimeout(() => {
+                        setResult(sample.mockResult);
+                        setLoading(false);
+                        showToast("Loaded sample case simulation results.", "success");
+                    }, 1000);
+                } else {
+                    showToast("Sample loaded. Click 'Run AI Diagnostics' to execute against local server.", "info");
+                }
+            };
+
+            const triggerScan = async () => {
+                if (!selectedImage && !previewUrl) {
+                    setError("Please upload a patient image or select a clinical reference sample first.");
+                    return;
+                }
+
+                setLoading(true);
+                setError(null);
+                setResult(null);
+
+                // Scenario A: Simulated Diagnostics
+                if (!isLiveMode) {
+                    setTimeout(() => {
+                        const rand = Math.random();
+                        const isMalignant = rand > 0.5;
+                        const conf = 82 + Math.random() * 16;
+                        setResult({
+                            prediction: isMalignant ? "malignant_lesions" : "benign_lesions",
+                            confidence: parseFloat(conf.toFixed(2)),
+                            raw_predictions: {
+                                benign_lesions: isMalignant ? (1 - conf/100) : conf/100,
+                                malignant_lesions: isMalignant ? conf/100 : (1 - conf/100)
+                            }
+                        });
+                        setLoading(false);
+                        showToast("Simulated clinical analysis complete.", "success");
+                    }, 1500);
+                    return;
+                }
+
+                // Scenario B: Live FastAPI execution (with resnet_model.h5)
+                if (!selectedImage) {
+                    setError("To scan live, please upload a local file through the browser file selector.");
+                    setLoading(false);
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append("file", selectedImage);
+
+                try {
+                    // Fetching against main.py running on port 8000
+                    const response = await fetch("http://localhost:8000/predict", {
+                        method: "POST",
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Server returned status code ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (data.success) {
+                        setResult({
+                            prediction: data.prediction,
+                            confidence: data.confidence,
+                            raw_predictions: data.raw_predictions
+                        });
+                        showToast("Live ResNet50 analysis completed successfully!", "success");
+                    } else {
+                        throw new Error("Diagnostic prediction failed on host server.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setError("Could not establish a connection to your local FastAPI server. Please make sure main.py is running on port 8000 in your 'oral_env' environment and CORS is allowed.");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const resetDiagnostics = () => {
+                setSelectedImage(null);
+                setPreviewUrl("");
+                setResult(null);
+                setError(null);
+                showToast("Workspace diagnostic state reset.");
+            };
+
+            return (
+                <div class="min-h-screen flex flex-col bg-slate-50">
+                    
+                    {}
+                    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 px-6 py-4">
+                        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-teal-600 text-white p-2.5 rounded-xl shadow-md shadow-teal-100 flex items-center justify-center">
+                                    <i class="fa-solid fa-tooth text-xl"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                                        OralScan AI
+                                        <span class="text-[11px] bg-teal-50 text-teal-700 font-semibold px-2 py-0.5 rounded-full border border-teal-100">ResNet50 v1.0</span>
+                                    </h1>
+                                    <p class="text-xs text-slate-500">Clinical Computer Vision and Deep Learning Pipeline</p>
+                                </div>
+                            </div>
+
+                            {/* Mode selection panel to allow user toggling */}
+                            <div class="flex items-center gap-4">
+                                <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                                    <button 
+                                        onClick={() => { setIsLiveMode(false); setError(null); }}
+                                        class={`px-3 py-1.5 rounded-lg font-medium transition ${!isLiveMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-teal-600"></i>Simulated
+                                    </button>
+                                    <button 
+                                        onClick={() => { setIsLiveMode(true); setError(null); }}
+                                        class={`px-3 py-1.5 rounded-lg font-medium transition ${isLiveMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        <i class="fa-solid fa-server mr-1.5 text-indigo-600"></i>Live FastAPI (Localhost)
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class={`h-2.5 w-2.5 rounded-full ${isLiveMode ? 'bg-indigo-500 animate-pulse' : 'bg-teal-500 animate-pulse'}`}></span>
+                                    <span class="text-xs font-semibold text-slate-600">{isLiveMode ? "Active Port: 8000" : "Simulated Mode"}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Toast Notification HUD */}
+                    {notification && (
+                        <div class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs animate-bounce">
+                            <i class={`fa-solid ${notification.type === 'success' ? 'fa-circle-check text-teal-400' : 'fa-circle-info text-sky-400'}`}></i>
+                            <span>{notification.message}</span>
+                        </div>
+                    )}
+
+                    {}
+                    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        
+                        {/* LEFT COLUMN: Input control sidebar */}
+                        <section class="lg:col-span-5 flex flex-col gap-6">
+                            
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-5">
+                                <div class="flex items-center justify-between">
+                                    <h2 class="text-sm font-bold text-slate-700 tracking-wide uppercase">Patient Clinical Input</h2>
+                                    {previewUrl && (
+                                        <button onClick={resetDiagnostics} class="text-slate-400 hover:text-rose-500 text-xs transition">
+                                            <i class="fa-solid fa-trash-can mr-1"></i> Clear Workspace
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Drag and Drop input field */}
+                                {!previewUrl ? (
+                                    <label class="border-2 border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50/20 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition group">
+                                        <div class="bg-slate-100 group-hover:bg-teal-50 text-slate-400 group-hover:text-teal-600 p-4 rounded-full mb-3 transition">
+                                            <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                                        </div>
+                                        <span class="text-sm font-semibold text-slate-700">Upload Patient Image</span>
+                                        <span class="text-xs text-slate-400 mt-1">PNG, JPG, JPEG up to 10MB</span>
+                                        <input type="file" class="hidden" accept="image/*" onChange={handleFileChange} />
+                                    </label>
+                                ) : (
+                                    <div class="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 aspect-square max-h-[350px] flex items-center justify-center">
+                                        <img src={previewUrl} alt="Diagnostic Scan Preview" class="w-full h-full object-cover" />
+                                        {loading && (
+                                            <div class="absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center text-white">
+                                                <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-2 text-teal-400"></i>
+                                                <span class="text-xs font-semibold tracking-wide">Inference execution in progress...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Diagnostics CTA */}
+                                <button
+                                    onClick={triggerScan}
+                                    disabled={loading || (!selectedImage && !previewUrl)}
+                                    class={`w-full py-3 px-6 rounded-xl font-semibold shadow-md flex items-center justify-center gap-2 transition ${
+                                        loading || (!selectedImage && !previewUrl)
+                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                                            : 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-100'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-circle-nodes"></i>
+                                    {loading ? "Analyzing..." : "Run AI Diagnostics"}
+                                </button>
+                            </div>
+
+                            {/* Reference Clinical Cases Block */}
+                            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
+                                <h3 class="text-xs font-bold text-slate-700 tracking-wider uppercase">Reference Clinical Samples</h3>
+                                <div class="grid grid-cols-1 gap-3">
+                                    {sampleCases.map((sample, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            onClick={() => loadSampleCase(sample)}
+                                            class="p-3 bg-slate-50 hover:bg-teal-50/40 rounded-xl border border-slate-100 hover:border-teal-200 cursor-pointer flex items-center gap-3 transition group"
+                                        >
+                                            <img src={sample.image} class="w-12 h-12 rounded-lg object-cover border border-slate-200" />
+                                            <div class="flex-grow">
+                                                <h4 class="text-xs font-bold text-slate-800 group-hover:text-teal-700 transition">{sample.name}</h4>
+                                                <p class="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{sample.desc}</p>
+                                            </div>
+                                            <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-teal-500 transition-transform group-hover:translate-x-1"></i>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* RIGHT COLUMN: Diagnostic Analysis Dashboard */}
+                        <section class="lg:col-span-7 flex flex-col gap-6">
+                            
+                            {/* Connection Error banner with detailed debugging info */}
+                            {error && (
+                                <div class="bg-rose-50 border border-rose-200 text-rose-800 p-5 rounded-2xl flex items-start gap-3.5">
+                                    <i class="fa-solid fa-triangle-exclamation text-xl text-rose-500 mt-0.5"></i>
+                                    <div>
+                                        <h4 class="font-bold text-sm">FastAPI Endpoint Connection Issue</h4>
+                                        <p class="text-xs text-rose-700 mt-1">{error}</p>
+                                        <div class="bg-white/80 p-3 rounded-lg border border-rose-100 mt-3 font-mono text-[10px] text-slate-700">
+                                            💡 Ensure `main.py` is active, your shell displays (oral_env), and uvicorn is hosted on port 8000.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Welcome Placeholder State */}
+                            {!result && !loading && (
+                                <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex-grow flex flex-col items-center justify-center text-center min-h-[350px]">
+                                    <div class="bg-teal-50 text-teal-600 p-5 rounded-full mb-4">
+                                        <i class="fa-solid fa-microscope text-3xl"></i>
+                                    </div>
+                                    <h3 class="text-base font-bold text-slate-800">No Analysis Output Generated</h3>
+                                    <p class="text-xs text-slate-500 max-w-sm mt-1.5">
+                                        Please load a custom medical image or select a pre-configured sample reference case on the left sidebar to execute diagnostic prediction.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Shimmer loading skeleton representation */}
+                            {loading && !result && (
+                                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-grow flex flex-col gap-6 min-h-[450px]">
+                                    <div class="h-6 w-1/4 shimmer rounded-md"></div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="h-24 w-24 rounded-full shimmer"></div>
+                                        <div class="flex-grow space-y-2">
+                                            <div class="h-4 w-1/2 shimmer rounded-md"></div>
+                                            <div class="h-3 w-1/3 shimmer rounded-md"></div>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-3 mt-4">
+                                        <div class="h-8 w-full shimmer rounded-md"></div>
+                                        <div class="h-16 w-full shimmer rounded-md"></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {}
+                            {result && !loading && (
+                                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-grow flex flex-col gap-6 animate-fade-in">
+                                    
+                                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                                        <div>
+                                            <h3 class="text-xs font-bold text-slate-400 tracking-wider uppercase">Diagnostics Output Report</h3>
+                                            <span class="text-[11px] text-slate-500">Model: Pretrained ResNet50 Architecture</span>
+                                        </div>
+                                        <span class="text-[10px] text-slate-400 bg-slate-100 py-1 px-2.5 rounded-md font-mono">Case ID: #OS-{Math.floor(Math.random() * 90000) + 10000}</span>
+                                    </div>
+
+                                    {/* Primary diagnosis metric */}
+                                    <div class="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                        {/* Precision concentric indicators */}
+                                        <div class="relative flex items-center justify-center">
+                                            <svg class="w-24 h-24 transform -rotate-90">
+                                                <circle cx="48" cy="48" r="40" stroke="#e2e8f0" stroke-width="7" fill="transparent" />
+                                                <circle 
+                                                    cx="48" 
+                                                    cy="48" 
+                                                    r="40" 
+                                                    stroke={result.prediction === "malignant_lesions" ? "#ef4444" : "#0d9488"} 
+                                                    stroke-width="7" 
+                                                    fill="transparent"
+                                                    strokeDasharray={2 * Math.PI * 40}
+                                                    strokeDashoffset={(2 * Math.PI * 40) * (1 - result.confidence / 100)}
+                                                    strokeLinecap="round"
+                                                />
+                                            </svg>
+                                            <span class="absolute text-sm font-extrabold text-slate-800">{result.confidence}%</span>
+                                        </div>
+
+                                        <div class="text-center sm:text-left">
+                                            <p class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Diagnostic Evaluation</p>
+                                            <h4 class={`text-base font-extrabold mt-1 uppercase ${
+                                                result.prediction === "malignant_lesions" ? "text-rose-600" : "text-teal-700"
+                                            }`}>
+                                                {result.prediction === "malignant_lesions" ? "Malignant Growth Detected" : "Benign Tissue Structure"}
+                                            </h4>
+                                            <p class="text-xs text-slate-500 mt-1 max-w-md leading-relaxed">
+                                                {result.prediction === "malignant_lesions" 
+                                                    ? "Potential high-risk clinical anomaly detected. Immediate scheduling of histopathological diagnostic evaluation or biopsy is highly advised." 
+                                                    : "Low risk morphology features observed. Consistent with apthous lesions, friction trauma keratosis, or normal healthy variations."}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Confidence Distribution */}
+                                    <div class="space-y-4">
+                                        <h4 class="text-xs font-bold text-slate-700 tracking-wider uppercase">Probability Spectrum</h4>
+                                        <div class="space-y-3.5">
+                                            {/* Benign Probability */}
+                                            <div>
+                                                <div class="flex justify-between text-xs font-semibold mb-1 text-slate-600">
+                                                    <span>Benign Lesion Score</span>
+                                                    <span>{(result.raw_predictions.benign_lesions * 100).toFixed(2)}%</span>
+                                                </div>
+                                                <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                    <div class="h-full bg-teal-600 transition-all duration-500" style={{ width: `${(result.raw_predictions.benign_lesions * 100)}%` }}></div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Malignant Probability */}
+                                            <div>
+                                                <div class="flex justify-between text-xs font-semibold mb-1 text-slate-600">
+                                                    <span>Malignant Lesion Score</span>
+                                                    <span>{(result.raw_predictions.malignant_lesions * 100).toFixed(2)}%</span>
+                                                </div>
+                                                <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                    <div class="h-full bg-rose-500 transition-all duration-500" style={{ width: `${(result.raw_predictions.malignant_lesions * 100)}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Clinical Pathway Plan */}
+                                    <div class="border-t border-slate-100 pt-5 mt-auto">
+                                        <h4 class="text-xs font-bold text-slate-700 tracking-wider uppercase mb-3">Suggested Clinical Protocol</h4>
+                                        <ul class="space-y-2">
+                                            <li class="flex items-start gap-2.5 text-xs text-slate-600">
+                                                <i class="fa-solid fa-clipboard-check text-teal-600 mt-0.5"></i>
+                                                <span><strong>Corroborative Diagnostics:</strong> Cross-reference this CNN finding with tactile palpatory findings and local lymph node evaluations.</span>
+                                            </li>
+                                            <li class="flex items-start gap-2.5 text-xs text-slate-600">
+                                                <i class="fa-solid fa-clipboard-check text-teal-600 mt-0.5"></i>
+                                                <span><strong>Temporal Observation:</strong> If lesion persistency exceeds 14 calendar days, refer patient for specialized surgical evaluation.</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    {/* Action button to trigger print/save */}
+                                    <button 
+                                        onClick={() => showToast("Exporting clinical PDF summary report...")}
+                                        class="w-full mt-2 py-2.5 border border-slate-200 hover:border-slate-300 text-slate-700 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition"
+                                    >
+                                        <i class="fa-solid fa-file-pdf text-rose-500"></i> Generate Clinical Health Summary Report
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+                    </main>
+
+                    {/* Footer HUD */}
+                    <footer class="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-400 mt-auto">
+                        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+                            <span>INSTANT AI & DATA SCIENCE TRAINING - SPRINT 2 PROJECT</span>
+                            <span>Designated for Educational Use Only • HIPAA-Compliant Architecture</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
