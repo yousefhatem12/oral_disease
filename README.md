@@ -1,28 +1,167 @@
-🦷 OralScan AI - Oral Diseases Image ClassificationAn advanced, production-ready Deep Learning pipeline and clinical computer vision system designed to classify oral lesions into Benign or Malignant categories. This project compares a Custom Convolutional Neural Network (CNN) against Transfer Learning via Pretrained ResNet50 (with custom hyperparameter tuning). The system is deployed via a high-performance FastAPI backend and an interactive ReactJS clinical dashboard.Developed as a key deliverable for Sprint 2 (Computer Vision & CNN) of the INSTANT AI & Data Science Training.🌟 Key FeaturesDeep Learning Architectures:Custom CNN: Built from scratch with multiple Conv2D, MaxPooling2D, Dropout, and Dense layers.Pretrained ResNet50: Transfer learning leveraged from ImageNet weights, freezing base layers, and tuning custom dense classification heads.Hyperparameter Tuning & Optimization: Implemented utilizing Stochastic Gradient Descent (SGD) with Momentum, learning rate scheduling, dropout regularization, and comparative metric analysis.Professional API Endpoint (FastAPI Backend):CORS middleware enabled for secure cross-origin communication with frontend clients.High-fidelity image preprocessing tailored to ResNet50 expectations (preprocess_input).Clinical User Dashboard (ReactJS Frontend):Highly interactive visual UI styled with Tailwind CSS and FontAwesome icons.Dual Mode Capability: Toggle seamlessly between Simulated and Live FastAPI connection.Dynamic performance meters, probability spectrum graphs, suggested medical protocols, and instant clinical report generation.📂 Repository StructurePlaintextORAL DISEASES IMAGE CLASSIFICATION/
+🦷 OralScan AI: Oral Diseases Image Classification
+
+An advanced, production-grade Deep Learning pipeline and clinical computer vision system engineered to classify oral lesions into Benign (low-risk) or Malignant (high-risk) categories.
+
+This project explores and compares a Custom 3-Layer Convolutional Neural Network (CNN) against Transfer Learning via Pretrained ResNet50 with custom hyperparameter tuning. The model is deployed with a high-performance FastAPI backend and an interactive ReactJS clinical dashboard.
+
+🌟 Key Features
+
+Dual Architecture Comparison:
+
+Custom CNN: Built from scratch with multiple Conv2D, MaxPooling2D, Dropout, and Dense layers.
+
+ResNet50 Transfer Learning: Leveraged pretrained ImageNet weights, froze feature extraction layers, and implemented a custom tuned classification head.
+
+Hyperparameter Tuning: Tuned with custom Stochastic Gradient Descent (SGD) with momentum, learning rate schedules, dropout regularization, and dense units configurations.
+
+High-Performance API (FastAPI Backend):
+
+Features custom image preprocessing (preprocess_input) to match ResNet50 requirements.
+
+Fully integrated with CORS Middleware to allow secure cross-origin communication with local or remote web clients.
+
+Clinical User Dashboard (ReactJS Frontend):
+
+Styled with Tailwind CSS and FontAwesome clinical icons.
+
+Dual-Inference Mode: Toggle between Simulated Diagnostic Mode and Live FastAPI Port Connection.
+
+Dynamic probability spectrum graphs, interactive progress gauges, custom suggested medical clinical protocols, and instant medical PDF report simulator.
+
+📂 Repository Structure
+
+The workspace is structured professionally to separate data, modeling, backend deployment, and frontend delivery:
+
+ORAL DISEASES IMAGE CLASSIFICATION/
 │
-├── original_data/                    # Dataset separated into diagnostic classes
-│   ├── benign_lesions/               # Normal variations, friction trauma, ulcers
-│   └── malignant_lesions/            # Potential high-risk oral cancers
+├── original_data/                    # Clinical dataset separated into diagnostic classes
+│   ├── benign_lesions/               # Non-cancerous, normal variations, or trauma lesions
+│   └── malignant_lesions/            # Potential high-risk oral cancerous growths
 │
 ├── Custom CNN Model.py               # Custom CNN training script built from scratch
 ├── Resenet_model.py                  # Transfer Learning script using ResNet50 & tuning
 ├── resnet_model.h5                   # Final trained and saved ResNet50 weights
 │
 ├── backend/                          # FastAPI Web Server Directory
-│   └── main.py                       # Main API serving image inference
+│   └── main.py                       # High-performance API serving image inference
 │
-└── frontend/                         # ReactJS Interface Directory
-    └── index.html                    # High-fidelity dashboard & patient portal
-🚀 Installation & SetupFollow these steps to deploy and run the entire ecosystem locally on your machine.1. Prerequisites & Environment SetupIt is highly recommended to isolate the project using a clean Conda environment to avoid package version mismatch:Bash# Create a new environment with Python 3.10
+└── frontend/                         # Interactive ReactJS Interface Directory
+    └── index.html                    # Single-file high-fidelity dashboard & patient portal
+
+
+🚀 Installation & Local Deployment
+
+Follow these structured steps to set up the clean virtual environment and run the complete system locally.
+
+1. Prerequisites & Environment Setup
+
+Using a clean Conda virtual environment prevents library conflicts (especially with TensorFlow/NumPy DLL warnings). Open your terminal and run:
+
+# Create a fresh Python 3.10 environment
 conda create -n oral_env python=3.10 -y
 
-# Activate the environment
+# Activate your new environment
 conda activate oral_env
-2. Install Required PackagesInstall the high-performance dependencies required for training, backend server, and image processing:Bashpython -m pip install tensorflow fastapi uvicorn pillow python-multipart numpy
-3. Training the ModelTo train the pretrained ResNet50 model on your dataset:Bashpython Resenet_model.py
-This will execute the data loading pipeline, apply ResNet50 validation split splits (80% train / 20% validation), execute training, and output resnet_model.h5 upon completion.4. Running the FastAPI BackendStart the backend web API on port 8000:Bash# Navigate to backend directory
+
+
+2. Install Dependencies
+
+Install all required libraries for the training pipeline, backend server, and image processing:
+
+python -m pip install tensorflow fastapi uvicorn pillow python-multipart numpy
+
+
+3. Model Training & Compilation
+
+To train the pretrained ResNet50 model on the dataset inside original_data/:
+
+python Resenet_model.py
+
+
+This script will load the dataset, split it (80% train / 20% validation), execute training with tuned hyperparameters, and save the optimized weights to resnet_model.h5.
+
+4. Running the FastAPI Backend
+
+Start the backend web API on port 8000:
+
+# Navigate to backend directory
 cd backend
 
-# Run the FastAPI server
+# Launch the FastAPI app with live reloading enabled
 python main.py
-The server will be hosted at [http://127.0.0.1:8000](http://127.0.0.1:8000). You can inspect the interactive swagger UI documentation at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).5. Launching the Frontend DashboardSimply open the frontend/index.html file in your preferred web browser (or right-click in VS Code and select Open with Live Server).Toggle the Live FastAPI mode on the top-right header to connect the UI directly with your active local machine inference server.📊 Training Results & Comparative AnalysisDuring our Sprint 2 benchmarks, we analyzed performance metrics between our custom from-scratch architectures and state-of-the-art pretrained weights:Model ArchitectureOptimizerTraining AccuracyValidation AccuracyInference Speed / LatencyCustom 3-Layer CNNSGD (lr=0.01)~76.4%~73.1%~12msPretrained ResNet50SGD (lr=0.001)~94.8%~92.5%~45msKey Insights:Transfer Learning Dominance: The features learned by ResNet50 on ImageNet transferred exceptionally well to medical oral tissue identification, resulting in a +19% increase in validation accuracy.Overfitting Mitigation: Incorporating Dropout(0.5) alongside GlobalAveragePooling2D helped keep the validation loss stable throughout the training epochs.⚠️ Clinical DisclaimerThis software is developed strictly for educational and research purposes as part of the INSTANT AI & Data Science Sprints. It is not intended to serve as a diagnostic tool for clinical medical use. All automated machine learning evaluations must be corroborated by a licensed dental professional or healthcare provider.
+
+
+The server will be successfully hosted locally at http://127.0.0.1:8000. You can inspect and test endpoints directly via the interactive Swagger docs at http://127.0.0.1:8000/docs.
+
+5. Launching the ReactJS Frontend
+
+Open frontend/index.html directly in your browser or right-click the file in VS Code and select Open with Live Server.
+
+Toggle the Live FastAPI option on the top right of the navigation header to direct React's fetch requests to your local running API.
+
+⚙️ Hyperparameter Tuning Details
+
+Our training script utilizes Stochastic Gradient Descent (SGD) with custom parameters:
+
+model.compile(
+    optimizer=SGD(learning_rate=0.001, momentum=0.9),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+
+Tuned Parameters evaluated during development:
+
+Base Model Freeze: base_model.trainable = False allows us to lock the feature extractor weights and train only the classifier head, speeding up training and preventing overfitting.
+
+Dense Layer Capacity: Adjusted to 256 hidden units with a relu activation function to capture high-level disease morphology.
+
+Dropout Rate: Configured to 0.5 to prevent over-reliance on single neuron paths.
+
+Optimizer: SGD with a low learning rate 0.001 and high momentum 0.9 ensures smooth, steady convergence.
+
+📊 Training Results & Comparative Analysis
+
+During our training benchmarks, we observed a massive performance gap between our custom CNN and the Pretrained ResNet50 transfer learning model:
+
+Model Architecture
+
+Optimizer
+
+Training Accuracy
+
+Validation Accuracy
+
+Inference Speed
+
+Custom 3-Layer CNN
+
+SGD (lr=0.01)
+
+~76.4%
+
+~73.1%
+
+~12ms
+
+Pretrained ResNet50
+
+SGD (lr=0.001)
+
+~94.8%
+
+~92.5%
+
+~45ms
+
+Key Achievements:
+
+Transfer Learning Advantage: Using ImageNet weights provided a +19.4% improvement on validation accuracy.
+
+Robust Regularization: The inclusion of Dropout and GlobalAveragePooling2D helped keep the validation curves perfectly flat and stable.
+
+⚠️ Clinical Disclaimer
+
+This software is developed strictly for educational, academic, and research purposes as part of the INSTANT AI & Data Science Sprints. It is not approved for real-world clinical use. All diagnostic decisions and evaluations must be validated by a licensed physician or dental health practitioner.
+
+⭐ If you find this project helpful for your learning path or Portfolio, please consider giving it a Star on GitHub!
