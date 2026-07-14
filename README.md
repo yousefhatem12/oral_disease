@@ -30,23 +30,8 @@ Dynamic probability spectrum graphs, interactive progress gauges, custom suggest
 
 📂 Repository Structure
 
-The workspace is structured professionally to separate data, modeling, backend deployment, and frontend delivery:
+<img width="251" height="352" alt="image" src="https://github.com/user-attachments/assets/5945ea0d-9a00-4ada-a088-6653706d34d6" />
 
-ORAL DISEASES IMAGE CLASSIFICATION/
-│
-├── original_data/                    # Clinical dataset separated into diagnostic classes
-│   ├── benign_lesions/               # Non-cancerous, normal variations, or trauma lesions
-│   └── malignant_lesions/            # Potential high-risk oral cancerous growths
-│
-├── Custom CNN Model.py               # Custom CNN training script built from scratch
-├── Resenet_model.py                  # Transfer Learning script using ResNet50 & tuning
-├── resnet_model.h5                   # Final trained and saved ResNet50 weights
-│
-├── backend/                          # FastAPI Web Server Directory
-│   └── main.py                       # High-performance API serving image inference
-│
-└── frontend/                         # Interactive ReactJS Interface Directory
-    └── index.html                    # Single-file high-fidelity dashboard & patient portal
 
 
 🚀 Installation & Local Deployment
